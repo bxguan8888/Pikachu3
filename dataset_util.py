@@ -56,5 +56,10 @@ def get_iterators_2(data_shape, batch_size):
 if __name__ == "__main__":
     train_data, test_data, class_names, num_class = get_iterators(data_shape, batch_size)
     train_data2, test_data2, class_names2, num_class2 = get_iterators_2(data_shape, batch_size)
+    i = 0
+
     for batch in train_data:
-        print batch
+        i += 1
+        print '%d batch: %s' % (i, str(batch))
+
+

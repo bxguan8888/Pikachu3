@@ -174,6 +174,10 @@ def SSD_builder(args):
 if __name__ == "__main__":
     # setup configure setting
     args = edict()
+    args.do_check_point = False
+    args.log_to_tensorboard = True
+    args.ctx = mx.gpu(0)
+
     args.batch_size = 32
     args.data_shape = (256, 256)
     args.num_classes = 1
@@ -188,7 +192,6 @@ if __name__ == "__main__":
     args.epoch = 100
     args.learning_rate = 0.001
     args.optimizer = 'adam'
-    args.ctx = mx.gpu(0)
     args.log_interval = 2
 
     args.save_name = "pikachu"
@@ -199,6 +202,8 @@ if __name__ == "__main__":
     # get training/testing dataset
     train_data, test_data, class_names, num_class = \
         get_iterators(args.data_shape[0], args.batch_size)
+
+    ## these two lines are useless (I guess author does it for testing)
     train_data.reshape(label_shape=(3, 5))
     train_data = test_data.sync_label_shape(train_data)
 
@@ -221,7 +226,7 @@ if __name__ == "__main__":
         LogMetricsCallback('logs/val-' + str(tme)),
     ]
 
-    mod = mx.mod.Module(context=mx.gpu(0),
+    mod = mx.mod.Module(context=args.ctx,
                         symbol=loss,
                         data_names=['data'],
                         label_names=['label'])
@@ -247,7 +252,8 @@ if __name__ == "__main__":
             loss, all_classes_pred, cls_target, all_boxes_pred, box_target, box_mask = preds
             cls_metric.update([cls_target], [mx.nd.transpose(all_classes_pred, (0, 2, 1))])
             box_metric.update([box_target], [all_boxes_pred * box_mask])
-            callback([cls_metric, box_metric], batch_end_callback)
+            if args.log_to_tensorboard:
+                callback([cls_metric, box_metric], batch_end_callback)
             mod.backward()
             mod.update()
 
@@ -262,16 +268,18 @@ if __name__ == "__main__":
         name2, val2 = box_metric.get()
         print('[Epoch %d] training: %s=%f, %s=%f' % (epoch, name1, val1, name2, val2))
         print('[Epoch %d] time cost: %f' % (epoch, time.time() - tic))
-        mod.save_checkpoint(args.prefix, epoch)
+        if args.do_check_point:
+            mod.save_checkpoint(args.prefix, epoch)
 
         # validation
         train_data.reset()
         cls_metric.reset()
         box_metric.reset()
-        for j, batch in enumerate(train_data):
+        for j, batch in enumerate(test_data):
             mod.forward(batch, is_train=False)
             preds = mod.get_outputs(merge_multi_context=True)
             loss, all_classes_pred, cls_target, all_boxes_pred, box_target, box_mask = preds
             cls_metric.update([cls_target], [mx.nd.transpose(all_classes_pred, (0, 2, 1))])
             box_metric.update([box_target], [all_boxes_pred * box_mask])
-            callback([cls_metric, box_metric], val_batch_end_callback)
+            if args.log_to_tensorboard:
+                callback([cls_metric, box_metric], val_batch_end_callback)
