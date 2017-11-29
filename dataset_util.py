@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import mxnet as mx
 import mxnet.image as image
 import numpy as np
