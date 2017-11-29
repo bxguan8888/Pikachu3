@@ -202,6 +202,9 @@ if __name__ == "__main__":
     # get training/testing dataset
     train_data, test_data, class_names, num_class = \
         get_iterators(args.data_shape[0], args.batch_size)
+    
+    train_data.reshape(label_shape=(3, 5))
+    test_data.reshape(label_shape=(3, 5))
 
     train_data.provide_data = [('data', (32, 3, 256, 256))]
     loss = SSD_builder(args)
@@ -241,6 +244,7 @@ if __name__ == "__main__":
         cls_metric.reset()
         box_metric.reset()
         tic = time.time()
+
         for i, batch in enumerate(train_data):
             btic = time.time()
             mod.forward(batch, is_train=True)
@@ -266,13 +270,14 @@ if __name__ == "__main__":
         print('[Epoch %d] time cost: %f' % (epoch, time.time() - tic))
         if args.do_check_point:
             mod.save_checkpoint(args.prefix, epoch)
-
+        
         # validation
         test_data.reset()
         cls_metric.reset()
         box_metric.reset()
 
-        for j, batch in enumerate(test_data):
+        i = 0
+        for i, batch in enumerate(test_data):
             mod.forward(batch, is_train=False)
             preds = mod.get_outputs(merge_multi_context=True)
             loss, all_classes_pred, cls_target, all_boxes_pred, box_target, box_mask = preds
