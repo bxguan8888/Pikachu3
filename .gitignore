@@ -1,0 +1,9 @@
+.idea
+*.params
+*.pyc
+*.zip
+*.tar.gz
+*.rec
+*.idx
+*.jpg
+*.idl
