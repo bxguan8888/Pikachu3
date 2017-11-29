@@ -203,10 +203,6 @@ if __name__ == "__main__":
     train_data, test_data, class_names, num_class = \
         get_iterators(args.data_shape[0], args.batch_size)
 
-    ## these two lines are useless (I guess author does it for testing)
-    train_data.reshape(label_shape=(3, 5))
-    train_data = test_data.sync_label_shape(train_data)
-
     train_data.provide_data = [('data', (32, 3, 256, 256))]
     loss = SSD_builder(args)
 
@@ -272,9 +268,10 @@ if __name__ == "__main__":
             mod.save_checkpoint(args.prefix, epoch)
 
         # validation
-        train_data.reset()
+        test_data.reset()
         cls_metric.reset()
         box_metric.reset()
+
         for j, batch in enumerate(test_data):
             mod.forward(batch, is_train=False)
             preds = mod.get_outputs(merge_multi_context=True)
@@ -283,3 +280,7 @@ if __name__ == "__main__":
             box_metric.update([box_target], [all_boxes_pred * box_mask])
             if args.log_to_tensorboard:
                 callback([cls_metric, box_metric], val_batch_end_callback)
+
+        name1, val1 = cls_metric.get()
+        name2, val2 = box_metric.get()
+        print('[Epoch %d] testing: %s=%f, %s=%f' % (epoch, name1, val1, name2, val2))
