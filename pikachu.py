@@ -80,15 +80,9 @@ def concat_predictions(preds):
     return mx.sym.concat(*preds, dim=1)
 
 
-def callback(metric_list, callback_list):
-    for metric in metric_list:
-        batch_end_params = BatchEndParam(epoch=epoch,
-                                         nbatch=i,
-                                         eval_metric=metric,
-                                         locals=locals())
-        for callback in _as_list(batch_end_callback):
-            callback(batch_end_params)
-
+def callback(name_value, callback_list):
+    for callback in _as_list(callback_list):
+        callback(name_value)
 
 class FocalLoss():
     def __init__(self, axis=-1, alpha=0.25, gamma=2, batch_axis=0, **kwargs):
@@ -219,11 +213,16 @@ if __name__ == "__main__":
 
     tme = time.time()
     batch_end_callback = [
-        LogMetricsCallback('logs/train-' + str(tme)),
+         LogMetricsCallback('logs/train-batch' + str(tme), prefix="train-batch"),
     ]
-    val_batch_end_callback = [
-        LogMetricsCallback('logs/val-' + str(tme)),
+
+    epoch_end_callback = [
+        LogMetricsCallback('logs/train-epoch' + str(tme), prefix="train-epoch"),
     ]
+    val_epoch_end_callback = [
+        LogMetricsCallback('logs/val-epoch' + str(tme), prefix="val-epoch"),
+    ]
+
 
     mod = mx.mod.Module(context=args.ctx,
                         symbol=loss,
@@ -253,7 +252,9 @@ if __name__ == "__main__":
             cls_metric.update([cls_target], [mx.nd.transpose(all_classes_pred, (0, 2, 1))])
             box_metric.update([box_target], [all_boxes_pred * box_mask])
             if args.log_to_tensorboard:
-                callback([cls_metric, box_metric], batch_end_callback)
+                name1, val1 = cls_metric.get()
+                name2, val2 = box_metric.get()
+                callback([(name1, val1), (name2, val2)], batch_end_callback)
             mod.backward()
             mod.update()
 
@@ -268,6 +269,8 @@ if __name__ == "__main__":
         name2, val2 = box_metric.get()
         print('[Epoch %d] training: %s=%f, %s=%f' % (epoch, name1, val1, name2, val2))
         print('[Epoch %d] time cost: %f' % (epoch, time.time() - tic))
+        if args.log_to_tensorboard:
+            callback([(name1, val1), (name2, val2)], epoch_end_callback)
         if args.do_check_point:
             mod.save_checkpoint(args.prefix, epoch)
         
@@ -283,9 +286,9 @@ if __name__ == "__main__":
             loss, all_classes_pred, cls_target, all_boxes_pred, box_target, box_mask = preds
             cls_metric.update([cls_target], [mx.nd.transpose(all_classes_pred, (0, 2, 1))])
             box_metric.update([box_target], [all_boxes_pred * box_mask])
-            if args.log_to_tensorboard:
-                callback([cls_metric, box_metric], val_batch_end_callback)
 
         name1, val1 = cls_metric.get()
         name2, val2 = box_metric.get()
+        if args.log_to_tensorboard:
+            callback([(name1, val1), (name2, val2)], val_epoch_end_callback)
         print('[Epoch %d] testing: %s=%f, %s=%f' % (epoch, name1, val1, name2, val2))
